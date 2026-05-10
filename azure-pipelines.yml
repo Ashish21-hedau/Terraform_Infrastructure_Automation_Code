@@ -1,0 +1,172 @@
+trigger:
+  branches:
+    include:
+      - main
+      - feature
+    exclude:
+      - main 
+pool:
+  name: Agentpool_ashish
+
+# Stage 1 : Terraform Install
+
+stages:
+  - stage: TerraformInstall
+    displayName: Terraform Install
+    jobs:
+      - job: TerraformInstall
+        displayName: Terraform Install
+        steps:
+          - task: TerraformInstaller@1
+            inputs:
+              terraformVersion: 'latest'
+
+    # Stage 2 : Terraform Init Validate Plan
+
+  - stage: TerraformInitValidatePlan
+    displayName: Terraform Init Validate Plan 
+    dependsOn: TerraformInstall
+    jobs:
+      - job: TerraformInit
+        displayName: Terrafore Init
+        steps:
+          - task: TerraformInstaller@1
+            displayName: Terraform Install
+            inputs:
+              terraformVersion: 'latest'
+          - task: TerraformTask@5
+            displayName: Terrafore Init
+            inputs:
+              provider: 'azurerm'
+              command: 'init'
+              workingDirectory: '$(System.DefaultWorkingDirectory)/Environment'
+              backendAzureRmUseEntraIdForAuthentication: false
+              backendServiceArm: 'pipelineashish'
+              backendAzureRmResourceGroupName: 'Pipelinekeliyeuse'
+              backendAzureRmStorageAccountName: 'ashisstorageacciunt'
+              backendAzureRmContainerName: 'ashishcontainers'
+              backendAzureRmKey: 'terraformashish.tfstate'
+          - task: TerraformTask@5
+            displayName: Terraform validate
+            inputs:
+              provider: 'azurerm'
+              command: 'validate'
+              workingDirectory: '$(System.DefaultWorkingDirectory)/Environment'
+          - task: TerraformTask@5
+            displayName: TerraformPlan
+            inputs:
+              provider: 'azurerm'
+              command: 'plan'
+              workingDirectory: '$(System.DefaultWorkingDirectory)/Environment'
+              environmentServiceNameAzureRM: 'pipelineashish'
+ 
+  # Stage 3 : Manual Approval
+  
+  - stage: TerrafomMualAppoval
+    displayName: Terraform manual approval
+    dependsOn: TerraformInitValidatePlan
+    condition: succeeded()
+    jobs:
+      - job: Terraformmaualapproval
+        displayName: Terraform manual approval
+        pool: server
+        steps:
+          - task: ManualValidation@1
+            displayName: Terraform manual approval
+            inputs:
+              notifyUsers: 'ashishkhedau182@gmail.com'
+              approvers: 'ashishkhedau182@gmail.com'
+              instructions: 'Please review and approve the Terraform deployment'
+              onTimeout: 'resume'
+
+# Stage 4 : Terraform Apply
+
+  - stage: TerrafomInitPlanValidateapply
+    displayName: Terrafom Init Plan Validate apply
+    dependsOn: TerrafomMualAppoval
+    condition: succeeded()
+    jobs:
+      - job: TerrafomInitPlanValidate
+        displayName: Terrafom Init Plan Validate apply
+        steps:
+          - task: TerraformTask@5
+            displayName: Terrafore Init
+            inputs:
+              provider: 'azurerm'
+              command: 'init'
+              workingDirectory: '$(System.DefaultWorkingDirectory)/Environment'
+              backendAzureRmUseEntraIdForAuthentication: false
+              backendServiceArm: 'pipelineashish'
+              backendAzureRmResourceGroupName: 'Pipelinekeliyeuse'
+              backendAzureRmStorageAccountName: 'ashisstorageacciunt'
+              backendAzureRmContainerName: 'ashishcontainers'
+              backendAzureRmKey: 'terraformashish.tfstate'
+          - task: TerraformTask@5
+            displayName: Terraform validate
+            inputs:
+              provider: 'azurerm'
+              command: 'validate'
+              workingDirectory: '$(System.DefaultWorkingDirectory)/Environment'         
+          - task: TerraformTask@5
+            displayName: TerraformPlan
+            inputs:
+              provider: 'azurerm'
+              command: 'plan'
+              workingDirectory: '$(System.DefaultWorkingDirectory)/Environment'
+              environmentServiceNameAzureRM: 'pipelineashish'
+          - task: TerraformTask@5
+            displayName: Terraform Apply
+            inputs:
+              provider: 'azurerm'
+              command: 'apply'
+              workingDirectory: '$(System.DefaultWorkingDirectory)/Environment'
+              environmentServiceNameAzureRM: 'pipelineashish'
+
+# Stage 5 : Terraform Destroy
+
+  - stage: TerraformDestroy
+    displayName: Terraform Destroy
+    dependsOn: TerrafomInitPlanValidateapply
+    condition: succeeded()
+    jobs:
+      - job: TerraformInstillInitStatedestroy
+        displayName:  Terraform Init for Destroy
+        steps:
+          - task: TerraformInstaller@1
+            displayName: Install Terraform Again
+            inputs:
+              terraformVersion: 'latest'              
+          - task: TerraformTask@5
+            displayName: Install Terraform Init Again 
+            inputs:
+              provider: 'azurerm'
+              command: 'init'
+              workingDirectory: '$(System.DefaultWorkingDirectory)/Environment'
+              backendAzureRmUseEntraIdForAuthentication: false
+              backendServiceArm: 'pipelineashish'
+              backendAzureRmResourceGroupName: 'Pipelinekeliyeuse'
+              backendAzureRmStorageAccountName: 'ashisstorageacciunt'
+              backendAzureRmContainerName: 'ashishcontainers'
+              backendAzureRmKey: 'terraformashish.tfstate'
+          - task: CmdLine@2
+            displayName: Check Terraform State Again
+            inputs:
+              script: |
+                terraform state list
+              workingDirectory: '$(System.DefaultWorkingDirectory)/Environment'
+       
+          - task: TerraformTask@5
+            displayName: Terraform destroy 
+            inputs:
+              provider: 'azurerm'
+              command: 'destroy'
+              workingDirectory: '$(System.DefaultWorkingDirectory)/Environment'
+              environmentServiceNameAzureRM: 'pipelineashish'
+              commandOptions: '-auto-approve'
+   
+
+
+      
+     
+
+   
